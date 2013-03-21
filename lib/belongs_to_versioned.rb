@@ -18,8 +18,8 @@ module LaserLemon
         define_method "#{association_id}_with_belongs_to_versioned" do
           parent = send("#{association_id}_without_belongs_to_versioned")
           target_version = case revert_to
-            when String: read_attribute(revert_to) rescue nil
-            when Symbol: send(revert_to) rescue nil
+            when String then read_attribute(revert_to) rescue nil
+            when Symbol then send(revert_to) rescue nil
             end
           parent.revert_to(target_version) if target_version && parent.respond_to?(:revert_to)
           parent
