@@ -1,0 +1,88 @@
+= belongs_to_versioned
+
+The purpose of <tt>belongs_to_versioned</tt> is to save version information as used by the <tt>acts_as_versioned</tt>[http://github.com/technoweenie/acts_as_versioned/tree/master] plugin by technoweenie[http://github.com/technoweenie] alongside <tt>belongs_to</tt> ActiveRecord associations.
+
+== Installation
+
+  script/plugin install git://github.com/laserlemon/belongs_to_versioned.git
+
+== Example
+
+In your migrations:
+
+  create_table :products do |t|
+    t.string :name
+    t.text :description
+    t.integer :price
+    t.integer :version
+    t.timestamps
+  end
+  Product.create_versioned_table
+
+
+  create_table :line_items do |t|
+    t.belongs_to :product
+    t.integer :product_version
+    t.integer :quantity
+    t.timestamps
+  end
+
+In your models:
+
+  class Product < ActiveRecord::Base
+    validates_presence_of :name, :description, :price
+    validates_numericality_of :price, :greater_than_or_equal_to => 0, :only_integer => true
+    
+    acts_as_versioned :if_changed => [:price]
+    
+    has_many :line_items
+  end
+
+
+  class LineItem < ActiveRecord::Base
+    validates_presence_of :product, :quantity
+    validates_numericality_of :quantity, :greater_than => 0, :only_integer => true
+    
+    belongs_to_versioned :product
+    
+    def subtotal
+      product.price * quantity
+    end
+  end
+
+In your controller:
+
+  product = Product.create(
+    :name => 'Settlers of Catan',
+    :description => 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+    :price => 3999
+  )
+  @line_items = []
+  @line_items << LineItem.create(:product => product, :quantity => 1)
+  product.update_attributes(:price => 2999)
+  @line_items << LineItem.create(:product => product, :quantity => 1)
+
+In your view:
+
+  <table>
+    <tr>
+      <th>Quantity</th>
+      <th>Product</th>
+      <th>Price</th>
+      <th>Subtotal</th>
+    </tr>
+    <%- @line_items.each do |line_item| -%>
+    <tr>
+      <td><%= line_item.quantity %></td>
+      <td><%=h line_item.product.name %></td>
+      <td><%= number_to_currency(line_item.product.price.to_f / 100) %></td>
+      <td><%= number_to_currency(line_item.subtotal.to_f / 100) %></td>
+    </tr>
+    <%- end -%>
+  </table>
+
+== Tips
+
+* As an alternative to the <tt>belongs_to_versioned</tt> method, you can pass a <tt>:versioned => true</tt> option to a typical <tt>belongs_to</tt> association.
+* The <tt>:revert_to</tt> option is an optional string specifying the column name to use when reverting the parent object. This defaults to the name of the association appended by <tt>"_version"</tt>.
+* If the <tt>:revert_to</tt> value is a symbol, that <tt>acts_as_versioned</tt> extension method will be used when reverting the parent object (i.e. <tt>:earliest</tt>).
