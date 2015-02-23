@@ -10,13 +10,14 @@ module LaserLemon
     end
     
     module ClassMethods
-      def belongs_to_versioned(association_id, options = {})
-        revert_to = options.delete(:revert_to) || association_id.to_s.foreign_key.gsub(/_id$/, '_version')
+      def belongs_to_versioned(target, scope, options = {})
+        revert_to = (scope.is_a?(Hash) ? scope : options).delete(:revert_to)
+        revert_to = revert_to || target.to_s.foreign_key.gsub(/_id$/, '_version')
         
-        belongs_to association_id, options
+        result = belongs_to target, scope, options
         
-        define_method "#{association_id}_with_belongs_to_versioned" do
-          parent = send("#{association_id}_without_belongs_to_versioned")
+        define_method "#{target}_with_belongs_to_versioned" do
+          parent = send("#{target}_without_belongs_to_versioned")
           target_version = case revert_to
             when String then read_attribute(revert_to) rescue nil
             when Symbol then send(revert_to) rescue nil
@@ -25,18 +26,21 @@ module LaserLemon
           parent
         end
         
-        alias_method_chain association_id, :belongs_to_versioned
+        alias_method_chain target, :belongs_to_versioned
         
-        define_method "#{association_id}_with_belongs_to_versioned=" do |parent|
+        define_method "#{target}_with_belongs_to_versioned=" do |parent|
           write_attribute(revert_to, (parent.respond_to?(:version) ? parent.version : nil)) if revert_to.is_a?(String)
-          send("#{association_id}_without_belongs_to_versioned=", parent)
+          send("#{target}_without_belongs_to_versioned=", parent)
         end
         
-        alias_method_chain "#{association_id}=", :belongs_to_versioned
+        alias_method_chain "#{target}=", :belongs_to_versioned
+
+        result
       end
       
-      def belongs_to_with_versioned(a, o = {})
-        o.delete(:versioned) ? belongs_to_versioned(a, o) : belongs_to_without_versioned(a, o)
+      def belongs_to_with_versioned(target, scope, options = {})
+        versioned = (scope.is_a?(Hash) ? scope : options).delete(:versioned)
+        versioned ? belongs_to_versioned(target, scope, options) : belongs_to_without_versioned(target, scope, options)
       end
     end
   end
