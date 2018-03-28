@@ -4,18 +4,19 @@ module LaserLemon
       base.extend ClassMethods
       base.class_eval do
         class << self
-          alias_method_chain :belongs_to, :versioned
+          alias_method :belongs_to_without_versioned, :belongs_to
+          alias_method :belongs_to, :belongs_to_with_versioned
         end
       end
     end
-    
+
     module ClassMethods
       def belongs_to_versioned(target, scope, options = {})
         revert_to = (scope.is_a?(Hash) ? scope : options).delete(:revert_to)
         revert_to = revert_to || target.to_s.foreign_key.gsub(/_id$/, '_version')
-        
+
         result = belongs_to target, scope, options
-        
+
         define_method "#{target}_with_belongs_to_versioned" do
           parent = send("#{target}_without_belongs_to_versioned")
           target_version = case revert_to
@@ -25,19 +26,21 @@ module LaserLemon
           parent.revert_to(target_version) if target_version && parent.respond_to?(:revert_to)
           parent
         end
-        
-        alias_method_chain target, :belongs_to_versioned
-        
+
+        alias_method "#{target}_without_belongs_to_versioned", target
+        alias_method target, "#{target}_with_belongs_to_versioned"
+
         define_method "#{target}_with_belongs_to_versioned=" do |parent|
           write_attribute(revert_to, (parent.respond_to?(:version) ? parent.version : nil)) if revert_to.is_a?(String)
           send("#{target}_without_belongs_to_versioned=", parent)
         end
-        
-        alias_method_chain "#{target}=", :belongs_to_versioned
+
+        alias_method "#{target}_without_belongs_to_versioned=", "#{target}="
+        alias_method "#{target}=", "#{target}_with_belongs_to_versioned="
 
         result
       end
-      
+
       def belongs_to_with_versioned(target, scope, options = {})
         versioned = (scope.is_a?(Hash) ? scope : options).delete(:versioned)
         versioned ? belongs_to_versioned(target, scope, options) : belongs_to_without_versioned(target, scope, options)
