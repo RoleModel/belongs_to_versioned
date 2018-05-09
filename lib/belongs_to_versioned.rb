@@ -11,7 +11,7 @@ module LaserLemon
     end
 
     module ClassMethods
-      def belongs_to_versioned(target, scope, options = {})
+      def belongs_to_versioned(target, scope = nil, **options)
         revert_to = (scope.is_a?(Hash) ? scope : options).delete(:revert_to)
         revert_to = revert_to || target.to_s.foreign_key.gsub(/_id$/, '_version')
 
@@ -41,9 +41,18 @@ module LaserLemon
         result
       end
 
-      def belongs_to_with_versioned(target, scope, options = {})
+      def belongs_to_with_versioned(target, scope = nil, **options)
         versioned = (scope.is_a?(Hash) ? scope : options).delete(:versioned)
-        versioned ? belongs_to_versioned(target, scope, options) : belongs_to_without_versioned(target, scope, options)
+        scope = nil if scope && scope.empty?
+        if versioned
+          belongs_to_versioned(target, scope, options)
+        else
+          if scope && scope.is_a?(Hash)
+            options = scope.dup
+            scope = nil
+          end
+          belongs_to_without_versioned(target, scope, options)
+        end
       end
     end
   end
